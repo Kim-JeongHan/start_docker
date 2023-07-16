@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y \
     whois \
     net-tools \
     sudo \
-    tmux
+    tmux \
+		gedit
 
 
 RUN locale-gen en_US.UTF-8
@@ -52,8 +53,7 @@ RUN rosdep init
 RUN apt-get install ros-melodic-rqt* -y 
 RUN apt-get install python3 python3-pip python-rosinstall python-rosdep python-rosinstall-generator -y
 
-RUN mkdir -p /workspace && chmod -R +x /workspace
-COPY ${WORKSPACE}/init-melodic.sh /workspace/
+
 
 RUN useradd -rm -d ${HOME} -s /bin/bash -g root -G sudo,audio,video,plugdev -u ${UID} ${UNAME}
 RUN mkdir -p /etc/sudoers.d && \
@@ -66,24 +66,9 @@ WORKDIR $HOME
 RUN rosdep update 
 RUN rosdep fix-permissions
 
-COPY ${WORKSPACE}/init_tools.sh ./
+RUN mkdir workspace && chmod -R +x /workspace
+COPY ${WORKSPACE}/init-melodic.sh ./workspace/
+COPY ${WORKSPACE}/init_tools.sh ./workspace/
 CMD ["/bin/bash", "init_tools.sh"]
 
 RUN cd /
-
-# 3
-#RUN mkdir -p $HOME/catkin_ws/src && cd $HOME/catkin_ws/src 
-#RUN catkin_init_workspace
-
-# 소스코드 다운로드
-#RUN cd $HOME/catkin_ws && catkin_make
-#RUN source /opt/ros/$ROS_DISTRO/setup.bash
-#RUN source /$HOME/catkin_ws/devel/setup.bash
-
-#RUN echo "source /opt/ros/melodic/setup.bash" >> $HOME/.bashrc
-#RUN echo "source /$HOME/catkin_ws/devel/setup.bash" >> $HOME/.bashrc
-#RUN echo "export ROS_HOSTNAME=localhost" >> $HOME/.bashrc
-#RUN echo "export ROS_MASTER_URI=http://localhost:11311" >> $HOME/.bashrc
-#RUN echo "alias cw='cd ~/catkin_ws'" >> $HOME/.bashrc
-#RUN echo "alias cs='cd ~/catkin_ws/src'" >> $HOME/.bashrc
-#RUN echo "alias cm='cd ~/catkin_ws && catkin_make'" >> $HOME/.bashrc
