@@ -4,7 +4,7 @@ FROM nvidia_ros:latest
 SHELL [ "/bin/bash" , "-c" ]
  
 # Install Git
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git build-essential
  
 # Create a Catkin workspace and clone TurtleBot3 repos
 RUN source /opt/ros/noetic/setup.bash \
