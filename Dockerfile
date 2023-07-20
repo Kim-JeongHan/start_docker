@@ -8,8 +8,9 @@ ARG UID=1000
 ARG GID=1000
 ARG HOME=/home/${UNAME}
 ARG WORKSPACE=${HOSTWORKSPACE}
+USER root
 
-
+SHELL ["/bin/bash", "-c"]
 RUN apt-get autoremove --purge --yes \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /etc/ros/rosdep/sources.list.d/20-default.list
@@ -55,10 +56,10 @@ RUN apt-get install python3 python3-pip python-rosinstall python-rosdep python-r
 
 
 
-RUN useradd -rm -d ${HOME} -s /bin/bash -g root -G sudo,audio,video,plugdev -u ${UID} ${UNAME}
 RUN mkdir -p /etc/sudoers.d && \
     echo "${UNAME} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${UNAME} && \
     chmod 0440 /etc/sudoers.d/${UNAME} 
+
 
 USER ${UNAME}
 WORKDIR $HOME
@@ -66,7 +67,7 @@ WORKDIR $HOME
 RUN rosdep update 
 RUN rosdep fix-permissions
 
-RUN mkdir workspace && chmod -R +x /workspace
+RUN mkdir workspace && chmod -R +x ./workspace
 COPY ${WORKSPACE}/init-melodic.sh ./workspace/
 COPY ${WORKSPACE}/init_tools.sh ./workspace/
 CMD ["/bin/bash", "init_tools.sh"]
