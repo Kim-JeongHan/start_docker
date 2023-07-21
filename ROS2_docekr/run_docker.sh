@@ -18,4 +18,4 @@ DOCKER_ENV_VARS="
 DOCKER_ARGS=${DOCKER_VOLUMES}" "${DOCKER_ENV_VARS}
 
 # Run the command
-docker run -it --net=host --ipc=host --privileged --gpus all ${DOCKER_ARGS} "$1" bash -c "$2"
+docker run -it --net=host --ipc=host --privileged ${DOCKER_ARGS} "$1" bash -c "$2"
