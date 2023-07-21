@@ -4,26 +4,20 @@
   <version>0.0.0</version>
   <description>Simple autonomy examples for TurtleBot3</description>
 
-  <maintainer email="sebas.a.castro@gmail.com">Sebastian Castro</maintainer>
+ <maintainer email="sebas.a.castro@gmail.com">Sebastian Castro</maintainer>
   <license>MIT</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <buildtool_depend>ament_cmake_python</buildtool_depend>
-
-  <depend>rclpy</depend>
-  <depend>rclcpp</depend>
-  <depend>rclcpp_action</depend>
-  <depend>ament_index_cpp</depend>
-  <depend>behaviortree_cpp</depend>
-  <depend>nav2_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>cv_bridge</depend>
+  <depend>actionlib</depend>
   <depend>sensor_msgs</depend>
+  <depend>move_base_msgs</depend>
+  <depend>image_transport</depend>
   <depend>tb3_worlds</depend>
-  <depend>tf2</depend>
-  <depend>tf2_ros</depend>
-  <depend>tf2_geometry_msgs</depend>
-  <depend>yaml-cpp</depend>
+  <depend>behaviortree_cpp_v3</depend>
+
+  <buildtool_depend>catkin</buildtool_depend>
 
   <export>
-    <build_type>ament_cmake</build_type>
   </export>
 </package>

@@ -1,117 +1,120 @@
-/*
- * Main behavior node for TurtleBot3. 
- */
+// Main behavior node for TurtleBot3 
 
-#include <chrono>
-#include <random>
-#include <string>
-
-#include "rclcpp/rclcpp.hpp"
-#include "ament_index_cpp/get_package_share_directory.hpp"
-#include "behaviortree_cpp/bt_factory.h"
-#include "behaviortree_cpp/xml_parsing.h"
-#include "behaviortree_cpp/loggers/groot2_publisher.h"
+#include "ros/ros.h"
 #include "yaml-cpp/yaml.h"
-
+#include "behaviortree_cpp_v3/behavior_tree.h"
+#include "behaviortree_cpp_v3/loggers/bt_zmq_publisher.h"
 #include "navigation_behaviors.h"
 #include "vision_behaviors.h"
 
-using namespace std::chrono_literals;
 
-const std::string default_bt_xml_file = 
-    ament_index_cpp::get_package_share_directory("tb3_autonomy") + "/bt_xml/tree_naive.xml";
-const std::string tb3_worlds_share_dir = 
-    ament_index_cpp::get_package_share_directory("tb3_worlds");
-const std::string default_location_file =
-    tb3_worlds_share_dir + "/maps/sim_house_locations.yaml";
+// "Naive" implementation where there is a hard-coded sequence for each location.
+// Here, there is a top-level fallback node that tries locations sequentially.
+// As you can see, this does not automatically scale with number of locations.
+static const char* xml_text_naive = R"(
+ <root main_tree_to_execute = "MainTree" >
+     <BehaviorTree ID="MainTree">
+        <Fallback name="root">
+            <Sequence name="search_location1">
+                <GoToPose       name="go_to_location1"  loc="location1" />
+                <LookForObject  name="look_in_location1"/>
+            </Sequence>
+            <Sequence name="search_location2">
+                <GoToPose       name="go_to_location2" loc="location2"/>
+                <LookForObject  name="look_in_location2"/>
+            </Sequence>
+            <Sequence name="search_location3">
+                <GoToPose       name="go_to_location3" loc="location3"/>
+                <LookForObject  name="look_in_location3"/>
+            </Sequence>
+            <Sequence name="search_location3">
+                <GoToPose       name="go_to_location4" loc="location4"/>
+                <LookForObject  name="look_in_location4"/>
+            </Sequence>
+        </Fallback>
+     </BehaviorTree>
+ </root>
+ )";
 
-
-class AutonomyNode : public rclcpp::Node {
-    public:
-        AutonomyNode() : Node("autonomy_node") {
-            // Read the location file and shuffle it
-            this->declare_parameter<std::string>(
-                "location_file", default_location_file);
-            location_file_ = 
-                this->get_parameter("location_file").as_string();
-            RCLCPP_INFO(this->get_logger(),
-                "Using location file %s", location_file_.c_str());
-
-            // Declare and get the other node parameters.
-            this->declare_parameter<std::string>("tree_xml_file", default_bt_xml_file);
-            tree_xml_file_ = this->get_parameter("tree_xml_file").as_string();
-            this->declare_parameter<std::string>("target_color", "");
-            target_color_ = this->get_parameter("target_color").as_string();
-            if (target_color_ != "") {
-                RCLCPP_INFO(this->get_logger(), "Searching for target color %s...",
-                    target_color_.c_str());
-            }
-        }
-
-        void execute() {
-            // Build and initialize the behavior tree based on parameters.
-            create_behavior_tree();
-
-            // Create a timer to tick the behavior tree.
-            const auto timer_period = 500ms;
-            timer_ = this->create_wall_timer(
-                timer_period,
-                std::bind(&AutonomyNode::update_behavior_tree, this));
-
-            rclcpp::spin(shared_from_this());
-            rclcpp::shutdown();
-        }
-
-        void create_behavior_tree() {
-            // Build a behavior tree from XML and set it up for logging
-            BT::BehaviorTreeFactory factory;
-            factory.registerNodeType<SetLocations>("SetLocations");
-            factory.registerNodeType<GetLocationFromQueue>("GetLocationFromQueue");
-            factory.registerNodeType<GoToPose>("GoToPose", shared_from_this());
-            factory.registerNodeType<LookForObject>("LookForObject", shared_from_this());
-            
-            auto blackboard = BT::Blackboard::create();
-            blackboard->set<std::string>("location_file", location_file_);
-            tree_ = factory.createTreeFromFile(tree_xml_file_, blackboard);
-            
-            // Set up tree logging to monitor the tree in Groot2.
-            // Default ports (1666/1667) are used by the Nav2 behavior tree, so we use another port.
-            // NOTE: You must have the PRO version of Groot2 to view live tree updates.
-            publisher_ptr_ = std::make_unique<BT::Groot2Publisher>(tree_, 1668);
-        }
-
-        void update_behavior_tree() {
-            // Tick the behavior tree.
-            BT::NodeStatus tree_status = tree_.tickOnce();
-            if (tree_status == BT::NodeStatus::RUNNING) {
-                return;
-            }
-            // Cancel the timer if we hit a terminal state.
-            if (tree_status == BT::NodeStatus::SUCCESS) {
-                RCLCPP_INFO(this->get_logger(), "Finished with status SUCCESS");
-                timer_->cancel();
-            } else if (tree_status == BT::NodeStatus::FAILURE) {
-                RCLCPP_INFO(this->get_logger(), "Finished with status FAILURE");
-                timer_->cancel();
-            }
-        }
-
-        // Configuration parameters.
-        std::string tree_xml_file_;
-        std::string location_file_;
-        std::string target_color_;
-
-        // ROS and BehaviorTree.CPP variables.
-        rclcpp::TimerBase::SharedPtr timer_;
-        BT::Tree tree_;
-        std::unique_ptr<BT::Groot2Publisher> publisher_ptr_;
-};
+// A better implementation which uses a queue of location names to iterate through 
+// visiting locations regardless of number of locations.
+static const char* xml_text_queue = R"(
+<root main_tree_to_execute = "MainTree" >
+    <BehaviorTree ID="MainTree">
+    <Sequence name="main_loop">
+        <SetLocations                   name="set_locations" num_locs="{num_locs}"/>
+        <RetryUntilSuccessful           num_attempts="{num_locs}">
+            <Sequence                   name="search_location">
+                <GetLocationFromQueue   name="get_loc"      target_location="{target_location}"/>   
+                <GoToPose               name="go_to_loc"    loc="{target_location}"/>
+                <LookForObject          name="look_for_obj" />
+            </Sequence>   
+        </RetryUntilSuccessful>
+    </Sequence>
+    </BehaviorTree>
+</root>
+)";
 
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<AutonomyNode>();
-    node->execute();
+    // Initialize ROS node
+    ros::init(argc, argv, "autonomy_node");
+    ros::NodeHandle nh;
+
+    // Read YAML file
+    std::string yaml_file;
+    while (!nh.hasParam("location_file")) {
+        ROS_INFO("Waiting for location_file parameter. Please load a world ...");
+        ros::Duration(3.0).sleep();
+    }
+    ros::param::get("location_file", yaml_file);
+    YAML::Node locations = YAML::LoadFile(yaml_file);
+    std::vector<std::string> loc_names;
+    for(YAML::const_iterator it=locations.begin(); it!=locations.end(); ++it) {
+        loc_names.push_back(it->first.as<std::string>());
+    }
+    std::srand(100);
+    std::random_shuffle(loc_names.begin(), loc_names.end());
+
+    // Build a behavior tree from XML and set it up for logging
+    std::string behavior_tree_type;
+    ros::param::get("behavior_tree_type", behavior_tree_type);
+    BT::Tree tree;
+    BT::BehaviorTreeFactory factory;
+    factory.registerNodeType<GoToPose>("GoToPose");
+    factory.registerNodeType<SetLocations>("SetLocations");
+    factory.registerNodeType<GetLocationFromQueue>("GetLocationFromQueue");
+    factory.registerNodeType<LookForObject>("LookForObject");
+    if ( behavior_tree_type == "naive" ) {
+        tree = factory.createTreeFromText(xml_text_naive);
+    } else if (behavior_tree_type == "queue") {
+        tree = factory.createTreeFromText(xml_text_queue);
+    } else {
+        std::cerr << "Invalid behavior tree type: " << behavior_tree_type << std::endl;
+        return 0;
+    }
+    for (auto &node : tree.nodes) {
+        if (auto vis_node = dynamic_cast<LookForObject*>(node.get())) {
+            vis_node->init(nh);
+        }
+    }
+    BT::PublisherZMQ publisher_zmq(tree);
+
+    // Tick the tree until it reaches a terminal state
+    BT::NodeStatus status = BT::NodeStatus::RUNNING;
+    while (status == BT::NodeStatus::RUNNING) {
+        status = tree.tickRoot();
+        ros::Duration(0.5).sleep();
+    }
+
+    // Output final results
+    std::string status_str;
+    if (status == BT::NodeStatus::SUCCESS) {
+        status_str = "SUCCESS";
+    } else {
+        status_str = "FAILURE";
+    }
+    ROS_INFO("Done with status %s!", status_str.c_str());
     return 0;
 }
