@@ -48,7 +48,7 @@ ENV NO_AT_BRIDGE 1
 
 # Set up the entrypoint
 WORKDIR /turtlebot3_ws
-COPY ./docker/entrypoint.sh /
+COPY ./ROS2_docker/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 ###########################################
@@ -66,7 +66,7 @@ RUN source /turtlebot3_ws/install/setup.bash \
  && colcon build --symlink-install
 
 # Set up the entrypoint
-COPY ./docker/entrypoint.sh /
+COPY ./ROS2_docker/entrypoint.sh /
 ENTRYPOINT [ "/entrypoint.sh" ]
 
 #####################

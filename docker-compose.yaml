@@ -18,7 +18,7 @@ services:
     image: turtlebot3_behavior:base
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: ROS2_docker/Dockerfile
       args:
         ROS_DISTRO: humble
       target: base
@@ -48,7 +48,7 @@ services:
     image: turtlebot3_behavior:overlay
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: ROS2_docker/Dockerfile
       target: overlay
 
   # Developer container
@@ -57,7 +57,7 @@ services:
     image: turtlebot3_behavior:dev
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: ROS2_docker/Dockerfile
       target: dev
       args:
         - UID=${UID:-1000}
