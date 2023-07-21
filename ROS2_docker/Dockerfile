@@ -59,8 +59,8 @@ FROM base AS overlay
 # Create an overlay Colcon workspace
 RUN mkdir -p /overlay_ws/src
 WORKDIR /overlay_ws
-COPY ./tb3_autonomy/ ./src/tb3_autonomy/
-COPY ./tb3_worlds/ ./src/tb3_worlds/
+COPY ./ros2_tb3_autonomy/ ./src/tb3_autonomy/
+COPY ./ros2_tb3_worlds/ ./src/tb3_worlds/
 RUN source /turtlebot3_ws/install/setup.bash \
  && rosdep install --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} -y \
  && colcon build --symlink-install
